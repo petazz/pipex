@@ -6,7 +6,7 @@
 /*   By: pgonzal2 <pgonzal2@student.42malaga.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/04/06 17:13:06 by pgonzal2          #+#    #+#             */
-/*   Updated: 2024/04/07 22:12:11 by pgonzal2         ###   ########.fr       */
+/*   Updated: 2024/04/08 15:10:02 by pgonzal2         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,6 +45,7 @@ void	child_process(char **argv, int fd[], char **env)
 	int	j;
 	char **path_splited;
 	char *def_path;
+	char **result_cmd;
 	
 	i = -1;
 	j = -1;
@@ -63,9 +64,46 @@ void	child_process(char **argv, int fd[], char **env)
 		
 		while (path_splited[++j] != '\0')
 		{
-			def_path = ft_strjoin(ft_strjoin(path_splited[j], "/"), argv[2]);
+			result_cmd = ft_split(argv[2], " ");
+			def_path = ft_strjoin(ft_strjoin(path_splited[j], "/"), result_cmd[0]);
 			if (access(def_path, X_OK) == 0);
-				execve(def_path, argv[2], env);
+				execve(def_path, result_cmd, env);
 		}
 	}
+	exit(0);
+}
+
+void	parent_process(char **argv, int fd[], char **env)
+{
+	int fd_write;
+	int	i;
+	int	j;
+	char **path_splited;
+	char *def_path;
+	char **result_cmd;
+	
+	i = -1;
+	j = -1;
+	fd_write = open(argv[4], O_RDONLY);
+	if(fd_write < 0)
+		ft_error();
+	if(dup2(fd_write, 0) == -1)
+		ft_error();
+	close(fd_write);
+	if(dup2(fd[1], 1) == -1)
+		ft_error();
+	close(fd[1]);
+	while(ft_strncmp(env[++i], "PATH", 4) != 0)
+	{
+		path_splited = ft_split(env[i], ':');
+		
+		while (path_splited[++j] != '\0')
+		{
+			result_cmd = ft_split(argv[2], " ");
+			def_path = ft_strjoin(ft_strjoin(path_splited[j], "/"), result_cmd[0]);
+			if (access(def_path, X_OK) == 0);
+				execve(def_path, result_cmd, env);
+		}
+	}
+	exit(0);
 }
