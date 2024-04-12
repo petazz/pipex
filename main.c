@@ -6,104 +6,120 @@
 /*   By: pgonzal2 <pgonzal2@student.42malaga.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/04/06 17:13:06 by pgonzal2          #+#    #+#             */
-/*   Updated: 2024/04/08 15:10:02 by pgonzal2         ###   ########.fr       */
+/*   Updated: 2024/04/12 20:11:55 by pgonzal2         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "pipex.h"
+
+void	ft_error(char *str)
+{
+	ft_putstr_fd(str, 2);
+	exit(EXIT_FAILURE);
+}
 
 int main(int argc, char **argv, char **env)
 {
 	int fd[2];
 	
 	if(argc != 5)
-		ft_error();
+		ft_error("No tiene 5 argumentos");
 	else
 	{
 		pipe(fd);
-		create_pid()
+		create_fork_pid(argv, fd, env);
 	}
 }
 
-void	create_pid()
+void	create_fork_pid(char **argv, int *fd, char **env)
 {
-	pid_t parent;
-	
-	parent = fork();
-	if(parent < 0)
-		return(perror("Error"));
-	if(!parent)
-		child_process(argv, fd[]);
+	pid_t pid;
+	pid_t pid2;
+
+	pid = fork();
+	if(pid < 0)
+		ft_error("Error en el primer fork");
+	if(pid == 0)
+		child_process(argv, fd, env);
 	else
-		parent_process(argv, fd[]);
+	{
+		close(fd[1]);
+		waitpid(pid, NULL, 0);
+		pid2 = fork();
+		if(pid2 < 0)
+			ft_error("Error en el segundo fork");
+		if(pid2 == 0)
+			second_child_process(argv, fd, env);
+		else
+		{		
+			close(fd[0]);
+			waitpid(pid2, NULL, 0);
+		}
+	}
+}
+
+void	split_path(char **env, char **argv)
+{
+	char **path_splited;
+	char **result_cmd;
+	int	i;
+	int	j;
+	char *def_path;
+	
+	i = 0;
+	j = -1;
+	while(env[i])
+	{
+		if(ft_strncmp(env[i], "PATH=", 5) == 0)
+		{
+			path_splited = ft_split(&env[i][5], ':');
+			while (path_splited[++j] != NULL)
+			{
+				result_cmd = ft_split(argv[2], ' ');
+				def_path = ft_strjoin(path_splited[j], "/");
+				def_path = ft_strjoin(def_path, result_cmd[0]);
+				if (access(def_path, X_OK) == 0)
+					execve(def_path, result_cmd, env);
+				else
+					free(def_path);
+			}
+		}
+		i++;
+	}
 }
 
 void	child_process(char **argv, int fd[], char **env)
 {
-	int fd_read;
-	int	i;
-	int	j;
-	char **path_splited;
-	char *def_path;
-	char **result_cmd;
-	
-	i = -1;
-	j = -1;
-	fd_read = open(argv[1], O_RDONLY);
-	if(fd_read < 0)
-		ft_error();
-	if(dup2(fd_read, 0) == -1)
-		ft_error();
-	close(fd_read);
-	if(dup2(fd[1], 1) == -1)
-		ft_error();
+	int infile_fd;
+
+	close(fd[0]);
+	infile_fd = open(argv[1], O_RDONLY);
+	if(infile_fd < 0)
+		ft_error("Error abriendo infile");
+	if(dup2(infile_fd, STDIN_FILENO) == -1)
+		ft_error("Error en la redireccion de la entrada a STDIN");
+	close(infile_fd);
+	if(dup2(fd[1], STDOUT_FILENO) == -1)
+		ft_error("Error en la redireccion de escritura del pipe");
 	close(fd[1]);
-	while(ft_strncmp(env[++i], "PATH", 4) != 0)
-	{
-		path_splited = ft_split(env[i], ':');
-		
-		while (path_splited[++j] != '\0')
-		{
-			result_cmd = ft_split(argv[2], " ");
-			def_path = ft_strjoin(ft_strjoin(path_splited[j], "/"), result_cmd[0]);
-			if (access(def_path, X_OK) == 0);
-				execve(def_path, result_cmd, env);
-		}
-	}
+	split_path(env, argv);
 	exit(0);
 }
 
-void	parent_process(char **argv, int fd[], char **env)
+void	second_child_process(char **argv, int fd[], char **env)
 {
-	int fd_write;
-	int	i;
-	int	j;
-	char **path_splited;
-	char *def_path;
-	char **result_cmd;
+	int outfile_fd;
 	
-	i = -1;
-	j = -1;
-	fd_write = open(argv[4], O_RDONLY);
-	if(fd_write < 0)
-		ft_error();
-	if(dup2(fd_write, 0) == -1)
-		ft_error();
-	close(fd_write);
-	if(dup2(fd[1], 1) == -1)
-		ft_error();
 	close(fd[1]);
-	while(ft_strncmp(env[++i], "PATH", 4) != 0)
-	{
-		path_splited = ft_split(env[i], ':');
-		
-		while (path_splited[++j] != '\0')
-		{
-			result_cmd = ft_split(argv[2], " ");
-			def_path = ft_strjoin(ft_strjoin(path_splited[j], "/"), result_cmd[0]);
-			if (access(def_path, X_OK) == 0);
-				execve(def_path, result_cmd, env);
-		}
-	}
+	outfile_fd = open(argv[4], O_CREAT | O_WRONLY | O_TRUNC, 0644);
+	if(outfile_fd < 0)
+		ft_error("Error creando outfile");
+	if(dup2(fd[0], STDIN_FILENO) == -1)
+		ft_error("Error en la redireccion de lectura del pipe");
+	close(fd[0]);
+	if(dup2(outfile_fd, STDOUT_FILENO) == -1)
+		ft_error("Error en la redireccion de salida a STDOUT");
+	close(outfile_fd);
+	split_path(env, argv);
 	exit(0);
 }
