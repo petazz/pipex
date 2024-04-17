@@ -6,7 +6,7 @@
 /*   By: pgonzal2 <pgonzal2@student.42malaga.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/04/06 17:13:06 by pgonzal2          #+#    #+#             */
-/*   Updated: 2024/04/12 20:11:55 by pgonzal2         ###   ########.fr       */
+/*   Updated: 2024/04/17 12:19:46 by pgonzal2         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -75,17 +75,60 @@ void	split_path(char **env, char **argv)
 			path_splited = ft_split(&env[i][5], ':');
 			while (path_splited[++j] != NULL)
 			{
-				result_cmd = ft_split(argv[2], ' ');
+				result_cmd = ft_split(*argv, ' ');
 				def_path = ft_strjoin(path_splited[j], "/");
 				def_path = ft_strjoin(def_path, result_cmd[0]);
-				if (access(def_path, X_OK) == 0)
-					execve(def_path, result_cmd, env);
+				ft_putstr_fd(def_path, 2);
+				if (access(def_path, X_OK) != 0)
+					ft_execve(def_path, split_cmd(*argv), env);
 				else
+				{
 					free(def_path);
+					ft_error("Command not found\n");
+				}
 			}
 		}
 		i++;
 	}
+}
+
+int	ft_count_comites(char const *s, char c)
+{
+	int	num_comites;
+	int	i;
+
+	i = 0;
+	num_comites = 0;
+	while (s[i] != '\0')
+	{
+		if(s[i] == c)
+			num_comites++;
+		i++;
+	}
+	return (num_comites);
+}
+
+char	**split_cmd(char *argv)
+{
+	char **cmd;
+	int num_comites;
+
+	cmd = NULL;
+	num_comites = ft_count_comites(argv, '\'');
+	if(num_comites == 2)
+	{	
+		cmd = ft_split(argv, '\'');
+		cmd[0] = ft_strtrim(cmd[0], " ");
+		return (cmd);
+	}	
+	else if(num_comites == 4)
+	{
+		cmd = ft_split(argv, ' ');
+		return (cmd);
+	}
+	else
+		ft_error("error de comandos");
+	return (cmd);
 }
 
 void	child_process(char **argv, int fd[], char **env)
@@ -102,7 +145,7 @@ void	child_process(char **argv, int fd[], char **env)
 	if(dup2(fd[1], STDOUT_FILENO) == -1)
 		ft_error("Error en la redireccion de escritura del pipe");
 	close(fd[1]);
-	split_path(env, argv);
+	split_path(env, &argv[2]);
 	exit(0);
 }
 
@@ -120,6 +163,6 @@ void	second_child_process(char **argv, int fd[], char **env)
 	if(dup2(outfile_fd, STDOUT_FILENO) == -1)
 		ft_error("Error en la redireccion de salida a STDOUT");
 	close(outfile_fd);
-	split_path(env, argv);
+	split_path(env, &argv[3]);
 	exit(0);
 }
